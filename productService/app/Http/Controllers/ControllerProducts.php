@@ -78,4 +78,45 @@ class ControllerProducts extends Controller
             return new ProductsResource('error', 'Product not found', null);
         }
     }
+    public function decreaseStock(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'Failed',
+                'message' => 'Validation error',
+                'data' => $validator->errors()
+            ], 422);
+        }
+
+        $product = Products::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'status' => 'Failed',
+                'message' => 'Product not found',
+                'data' => null
+            ], 404);
+        }
+
+        if ($product->stock < $request->quantity) {
+            return response()->json([
+                'status' => 'Failed',
+                'message' => 'Stok tidak mencukupi',
+                'data' => null
+            ], 400);
+        }
+
+        $product->stock = $product->stock - $request->quantity;
+        $product->save();
+
+        return response()->json([
+            'status' => 'Success',
+            'message' => 'Stock berhasil dikurangi',
+            'data' => $product
+        ]);
+    }
 }

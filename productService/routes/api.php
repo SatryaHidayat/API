@@ -9,3 +9,4 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::apiResource('products', ControllerProducts::class);
+Route::put('/products/{id}/decrease-stock', [ControllerProducts::class, 'decreaseStock']);
