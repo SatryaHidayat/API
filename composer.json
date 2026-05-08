@@ -1,0 +1,10 @@
+{
+    "require": {
+        "vladimir-yuldashev/laravel-queue-rabbitmq": "^6.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "kylekatarnls/update-helper": true
+        }
+    }
+}
