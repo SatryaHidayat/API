@@ -12,7 +12,7 @@ services:
     build: ./OrderService
     container_name: order_app
     ports:
-      - "8001:8000"
+      - "8081:8000"
     volumes:
       - ./OrderService:/var/www
     networks:
@@ -22,7 +22,7 @@ services:
     build: ./ProductService
     container_name: product_app
     ports:
-      - "8002:8000"
+      - "8080:8000"
     volumes:
       - ./ProductService:/var/www
     networks:
@@ -32,7 +32,7 @@ services:
     build: ./UserService
     container_name: user_app
     ports:
-      - "8003:8000"
+      - "8082:8000"
     volumes:
       - ./UserService:/var/www
     networks:

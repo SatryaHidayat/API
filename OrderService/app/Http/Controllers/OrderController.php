@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\OrderResource;
-
+use Illuminate\Support\Facades\Log;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Http\Request;
@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use App\Jobs\ProcessOrderQueue;
+
 
 class OrderController extends Controller
 {
@@ -79,9 +80,9 @@ class OrderController extends Controller
             'notes'              => 'nullable|string',
         ]);
 
-    if ($validator->fails()) {
-        return new OrderResource('Failed', 'Validation error', $validator->errors());
-    }
+        if ($validator->fails()) {
+            return new OrderResource('Failed', 'Validation error', $validator->errors());
+        }
 
         // Consume UserService — validasi user ada
         $userResponse = Http::get(env('USER_SERVICE_URL') . '/api/users/' . $request->user_id);
@@ -93,14 +94,14 @@ class OrderController extends Controller
         $items      = [];
         $totalPrice = 0;
 
-    foreach ($request->items as $item) {
-        $productResponse = Http::get(env('PRODUCT_SERVICE_URL') . '/api/products/' . $item['product_id']);
+        foreach ($request->items as $item) {
+            $productResponse = Http::get(env('PRODUCT_SERVICE_URL') . '/api/products/' . $item['product_id']);
 
-        if ($productResponse->failed()) {
-            return new OrderResource('Failed', 'Produk dengan ID ' . $item['product_id'] . ' tidak ditemukan', null);
-        }
+            if ($productResponse->failed()) {
+                return new OrderResource('Failed', 'Produk dengan ID ' . $item['product_id'] . ' tidak ditemukan', null);
+            }
 
-        $product = $productResponse->json('data');
+            $product = $productResponse->json('data');
 
             if ($product['stock'] < $item['quantity']) {
                 return new OrderResource('Failed', 'Stok produk ' . $product['name'] . ' tidak mencukupi', null);
@@ -132,47 +133,88 @@ class OrderController extends Controller
             }
 
             DB::commit();
-            // ... di dalam loop foreach ($items as $item) atau setelah DB::commit()
-
-            foreach ($items as $item) {
-                $decreaseResponse = Http::put(env('PRODUCT_SERVICE_URL') . '/api/products/' . $item['product_id'] . '/decrease-stock', [
-                    'quantity' => $item['quantity']
-                ]);
-
-                if ($decreaseResponse->failed()) {
-                    // Logika penanganan jika gagal (misal: rollback order atau tandai error)
-                }
-            }
         } catch (\Exception $e) {
             DB::rollBack();
             return new OrderResource('Failed', 'Gagal membuat order: ' . $e->getMessage(), null);
         }
 
+        // Decrease stock setelah commit
+        foreach ($items as $item) {
+            $decreaseResponse = Http::put(
+                env('PRODUCT_SERVICE_URL') . '/api/products/' . $item['product_id'] . '/decrease-stock',
+                ['quantity' => $item['quantity']]
+            );
+
+            if ($decreaseResponse->failed()) {
+                // Log warning — order sudah dibuat, tandai untuk manual review
+                Log::warning('Gagal decrease stock untuk product_id: ' . $item['product_id']);
+            }
+        }
+
+        // ✅ Dispatch SEBELUM return, dengan data yang benar
         $orderData = [
-            'order_id' => 'ORD-' . time(),
-            'customer_id' => $request->input('customer_id'),
-            'items' => $request->input('items'),
+            'order_id'    => $order->id,           // ✅ pakai ID dari DB
+            'customer_id' => $order->user_id,      // ✅ bukan customer_id
+            'items'       => $items,               // ✅ pakai $items yang sudah diproses
         ];
 
-        return new OrderResource('Success', 'Order created successfully', $order->load('items'));
+        ProcessOrderQueue::dispatch($orderData)->onQueue('order-processing');
 
-        ProcessOrderQueue::dispatch($orderData)
-            ->onQueue('order-processing');
+        return new OrderResource('Success', 'Order diterima dan sedang diproses', $order->load('items'));
+        // DB::beginTransaction();
+        // try {
+        //     $order = Order::create([
+        //         'user_id'     => $request->user_id,
+        //         'status'      => 'pending',
+        //         'total_price' => $totalPrice,
+        //         'notes'       => $request->notes,
+        //     ]);
 
-       
+        //     foreach ($items as $item) {
+        //         $order->items()->create($item);
+        //     }
+
+        //     DB::commit();
+        //     // ... di dalam loop foreach ($items as $item) atau setelah DB::commit()
+
+        //     foreach ($items as $item) {
+        //         $decreaseResponse = Http::put(env('PRODUCT_SERVICE_URL') . '/api/products/' . $item['product_id'] . '/decrease-stock', [
+        //             'quantity' => $item['quantity']
+        //         ]);
+
+        //         if ($decreaseResponse->failed()) {
+        //             // Logika penanganan jika gagal (misal: rollback order atau tandai error)
+        //         }
+        //     }
+        // } catch (\Exception $e) {
+        //     DB::rollBack();
+        //     return new OrderResource('Failed', 'Gagal membuat order: ' . $e->getMessage(), null);
+        // }
+
+        // $orderData = [
+        //     'order_id' => 'ORD-' . time(),
+        //     'customer_id' => $request->input('customer_id'),
+        //     'items' => $request->input('items'),
+        // ];
+
+
+
+        // ProcessOrderQueue::dispatch($orderData)->onQueue('order-processing');
+
+        // return new OrderResource('Success', 'Order diterima dan sedang diproses', $order->load('items'));
 
         // Lemparkan data tersebut ke RabbitMQ melalui Job
-        
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Order diterima dan masuk ke dalam antrean pemrosesan.'
-        ]);
 
-        
-        
-  
-        
+        // return response()->json([
+        //     'status' => 'success',
+        //     'message' => 'Order diterima dan masuk ke dalam antrean pemrosesan.'
+        // ]);
+
+
+
+
+
     }
 
     // PUT /api/orders/{id}/status
