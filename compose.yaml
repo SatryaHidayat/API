@@ -41,6 +41,18 @@ services:
     networks:
       - iae_network
 
+  payment-service:
+    build: ./PaymentService
+    image: api-payment-service
+    container_name: payment_app
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    ports:
+      - "8083:8000"
+    volumes:
+      - ./PaymentService:/var/www
+    networks:
+      - iae_network
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: iae_rabbitmq

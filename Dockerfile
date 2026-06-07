@@ -55,7 +55,7 @@
 # RUN docker-php-ext-install sockets
 
 # 1. Gunakan image PHP resmi dengan versi yang sesuai
-FROM php:8.2-fpm
+FROM php:8.4-fpm
 
 # 2. Tentukan direktori kerja di dalam container
 WORKDIR /var/www
