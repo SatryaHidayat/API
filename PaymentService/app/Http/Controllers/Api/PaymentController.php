@@ -40,7 +40,6 @@ class PaymentController extends Controller
         }
 
         $orderResponse = $response->json();
-
         $order = $orderResponse['data'] ?? $orderResponse;
 
         $payment = Payment::create([
@@ -97,8 +96,7 @@ class PaymentController extends Controller
                 $orderResponse = Http::timeout(5)
                     ->retry(2, 200)
                     ->put(
-                        rtrim(env('ORDER_SERVICE_URL', 'http://order-service:8000'), '/')
-                            . '/api/orders/' . $payment->order_id,
+                        rtrim(env('ORDER_SERVICE_URL', 'http://order-service:8000'), '/') . '/api/orders/' . $payment->order_id,
                         ['status' => 'paid']
                     );
             } catch (Throwable $exception) {
@@ -122,18 +120,18 @@ class PaymentController extends Controller
             'paid_at' => $request->status === 'paid' ? now() : null,
         ]);
 
-        // Jika payment sudah paid, update status order otomatis ke OrderService
         if ($request->status === 'paid') {
-            Http::put(env('ORDER_SERVICE_URL') . '/api/orders/' . $payment->order_id, [
-                'status' => 'paid'
-            ]);
+            try {
+                $this->publishPaymentPaid($payment);
+            } catch (Throwable $exception) {
+                // Payment tetap berhasil walaupun publish RabbitMQ gagal.
+            }
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Status payment berhasil diperbarui dan order ikut diperbarui',
             'message' => $request->status === 'paid'
-                ? 'Payment lunas dan status order berhasil diubah menjadi paid'
+                ? 'Payment lunas, status order berhasil diubah menjadi paid, dan event RabbitMQ dikirim'
                 : 'Status payment berhasil diperbarui',
             'data' => $payment
         ]);
@@ -157,6 +155,26 @@ class PaymentController extends Controller
             'message' => 'Payment berhasil dihapus'
         ]);
     }
+
+    public function getByOrder($order_id)
+    {
+        $payment = Payment::where('order_id', $order_id)->latest()->first();
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment untuk order ini belum ditemukan',
+                'data' => null
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment ditemukan berdasarkan order',
+            'data' => $payment
+        ]);
+    }
+
     private function publishPaymentPaid($payment)
     {
         $connection = new AMQPStreamConnection(
@@ -167,7 +185,6 @@ class PaymentController extends Controller
         );
 
         $channel = $connection->channel();
-
         $queue = env('RABBITMQ_QUEUE', 'payment-paid');
 
         $channel->queue_declare($queue, false, true, false, false);
@@ -190,23 +207,5 @@ class PaymentController extends Controller
 
         $channel->close();
         $connection->close();
-    }
-    public function getByOrder($order_id)
-    {
-        $payment = Payment::where('order_id', $order_id)->latest()->first();
-
-        if (!$payment) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment untuk order ini belum ditemukan',
-                'data' => null
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Payment ditemukan berdasarkan order',
-            'data' => $payment
-        ]);
     }
 }
