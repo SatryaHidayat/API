@@ -106,7 +106,7 @@ class OrderMutation
     public function updateStatus($_, array $args): array
     {
         $validator = Validator::make($args, [
-            'status' => 'required|in:pending,confirmed,cancelled',
+            'status' => 'required|in:pending,paid,confirmed,cancelled',
         ]);
 
         if ($validator->fails()) {

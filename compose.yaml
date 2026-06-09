@@ -20,13 +20,13 @@ services:
       - iae_network
 
   product-service:
-    build: ./ProductService
+    build: ./productService
     container_name: product_app
     command: php artisan serve --host=0.0.0.0 --port=8000
     ports:
       - "8080:8000"
     volumes:
-      - ./ProductService:/var/www
+      - ./productService:/var/www
     networks:
       - iae_network
 
