@@ -55,7 +55,7 @@
 # RUN docker-php-ext-install sockets
 
 # 1. Gunakan image PHP resmi dengan versi yang sesuai
-FROM php:8.2-fpm
+FROM php:8.4-fpm
 
 # 2. Tentukan direktori kerja di dalam container
 WORKDIR /var/www
@@ -86,4 +86,4 @@ RUN composer install --no-interaction --optimize-autoloader --no-dev
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 EXPOSE 9000
-CMD ["php-fpm"]
+CMD php artisan serve --host=0.0.0.0 --port=8000

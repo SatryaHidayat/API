@@ -1,0 +1,67 @@
+"A datetime string with format `Y-m-d H:i:s`, e.g. `2018-05-23 13:43:32`."
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+enum OrderStatus {
+    pending
+    confirmed
+    cancelled
+}
+
+type Query {
+    orders: [Order!]! @field(resolver: "App\\GraphQL\\Queries\\OrderQuery@all")
+    order(id: ID!): OrderPayload! @field(resolver: "App\\GraphQL\\Queries\\OrderQuery@find")
+    ordersByUser(user_id: ID!): OrdersPayload! @field(resolver: "App\\GraphQL\\Queries\\OrderQuery@byUser")
+}
+
+type Mutation {
+    createOrder(input: CreateOrderInput!): OrderPayload! @field(resolver: "App\\GraphQL\\Mutations\\OrderMutation@create")
+    updateOrderStatus(id: ID!, status: OrderStatus!): OrderPayload! @field(resolver: "App\\GraphQL\\Mutations\\OrderMutation@updateStatus")
+    updateOrderItemQuantity(order_id: ID!, item_id: ID!, quantity: Int!): OrderPayload! @field(resolver: "App\\GraphQL\\Mutations\\OrderMutation@updateQuantity")
+    deleteOrder(id: ID!): OrderPayload! @field(resolver: "App\\GraphQL\\Mutations\\OrderMutation@delete")
+}
+
+input CreateOrderInput {
+    user_id: ID!
+    notes: String
+    items: [CreateOrderItemInput!]!
+}
+
+input CreateOrderItemInput {
+    product_id: ID!
+    quantity: Int!
+}
+
+type OrderPayload {
+    status: String!
+    message: String!
+    data: Order
+}
+
+type OrdersPayload {
+    status: String!
+    message: String!
+    data: [Order!]!
+}
+
+type Order {
+    id: ID!
+    user_id: ID!
+    status: OrderStatus!
+    total_price: Float!
+    notes: String
+    items: [OrderItem!]!
+    created_at: DateTime
+    updated_at: DateTime
+}
+
+type OrderItem {
+    id: ID!
+    order_id: ID!
+    product_id: ID!
+    product_name: String!
+    price: Float!
+    quantity: Int!
+    subtotal: Float!
+    created_at: DateTime
+    updated_at: DateTime
+}
