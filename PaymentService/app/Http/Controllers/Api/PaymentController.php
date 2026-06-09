@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class PaymentController extends Controller
 {
@@ -89,17 +90,41 @@ class PaymentController extends Controller
             ], 404);
         }
 
-        $payment->status = $request->status;
-
         if ($request->status === 'paid') {
-            $payment->paid_at = now();
+            try {
+                $orderResponse = Http::timeout(5)
+                    ->retry(2, 200)
+                    ->put(
+                        rtrim(env('ORDER_SERVICE_URL', 'http://order-service:8000'), '/')
+                            . '/api/orders/' . $payment->order_id,
+                        ['status' => 'paid']
+                    );
+            } catch (Throwable $exception) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment belum diubah karena OrderService tidak dapat dihubungi',
+                ], 502);
+            }
+
+            if ($orderResponse->failed()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment belum diubah karena status order gagal diperbarui',
+                    'order_service_response' => $orderResponse->json(),
+                ], 502);
+            }
         }
 
-        $payment->save();
+        $payment->update([
+            'status' => $request->status,
+            'paid_at' => $request->status === 'paid' ? now() : null,
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Status payment berhasil diperbarui',
+            'message' => $request->status === 'paid'
+                ? 'Payment lunas dan status order berhasil diubah menjadi paid'
+                : 'Status payment berhasil diperbarui',
             'data' => $payment
         ]);
     }

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('orders', function (Blueprint $table) {
         $table->id();
         $table->unsignedBigInteger('user_id');
-        $table->enum('status', ['pending', 'confirmed', 'cancelled'])->default('pending');
+        $table->enum('status', ['pending', 'paid', 'confirmed', 'cancelled'])->default('pending');
         $table->decimal('total_price', 12, 2)->default(0);
         $table->text('notes')->nullable();
         $table->softDeletes();   
