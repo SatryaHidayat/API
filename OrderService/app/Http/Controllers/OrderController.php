@@ -221,7 +221,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,confirmed,cancelled',
+            'status' => 'required|in:pending,paid,confirmed,cancelled',
         ]);
 
         if ($validator->fails()) {
